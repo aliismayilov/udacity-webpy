@@ -1,12 +1,31 @@
+import os
+
 import webapp2
+import jinja2
+
+
+JINJA_ENVIRONMENT = jinja2.Environment(
+  loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
+  extensions=['jinja2.ext.autoescape']
+)
 
 
 class MainPage(webapp2.RequestHandler):
+  def get(self):
+    template = JINJA_ENVIRONMENT.get_template('play.html')
+    self.response.out.write(template.render())
 
-	def get(self):
-		self.response.headers['Content-Type'] = 'text/plain'
-		self.response.write('Hello, Udacity!')
+
+class TestHandler(webapp2.RequestHandler):
+  def get(self):
+    q = self.request.get("q")
+    self.response.out.write(q)
+
+    # self.response.headers['Content-Type'] = 'text/plain'
+    # self.response.out.write(self.request)
+
 
 application = webapp2.WSGIApplication([
-	('/', MainPage),
+  ('/', MainPage),
+  ('/testform', TestHandler),
 ], debug=True)
