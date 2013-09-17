@@ -65,7 +65,6 @@ textarea {
 
 input[type=submit] {
   font-size: 24px;
-  display: block;
 }
 
 .main-title {
@@ -90,13 +89,6 @@ input[type=submit] {
 .post-title {
     font-size: 24px;
     font-weight: bold;
-
-    text-decoration: none;
-    color: #333;
-}
-
-.post-title:visisted {
-    color: #333;
 }
 
 .post-date {
@@ -109,12 +101,4 @@ input[type=submit] {
 
 .post-content {
     margin-top: 5px;
-}
-
-.age {
-    position: absolute;
-    bottom: 0px;
-    right: 0px;
-    color: gray;
-    font-size: 12px;
 }
