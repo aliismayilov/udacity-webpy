@@ -3,6 +3,7 @@ import re
 import random
 import hashlib
 import hmac
+import json
 from string import letters
 
 import webapp2
@@ -130,10 +131,29 @@ class Post(db.Model):
         self._render_text = self.content.replace('\n', '<br>')
         return render_str("post.html", p = self)
 
+class PostEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Post):
+            return {
+                'content': obj.content,
+                'subject': obj.subject,
+                'created': obj.created.isoformat(),
+                'last_modified': obj.last_modified.isoformat()
+            }
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
+
 class BlogFront(BlogHandler):
     def get(self):
         posts = greetings = Post.all().order('-created')
         self.render('front.html', posts = posts)
+
+class BlogFrontJson(BlogHandler):
+    def get(self):
+        posts = greetings = Post.all().order('-created')
+        posts = list(posts)
+        self.response.headers['Content-Type'] = "application/json'; charset=utf-8"
+        self.write(json.dumps(posts, cls=PostEncoder))
 
 class PostPage(BlogHandler):
     def get(self, post_id):
@@ -145,6 +165,18 @@ class PostPage(BlogHandler):
             return
 
         self.render("permalink.html", post = post)
+
+class PostPageJson(BlogHandler):
+    def get(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+
+        if not post:
+            self.error(404)
+            return
+
+        self.response.headers['Content-Type'] = "application/json'; charset=utf-8"
+        self.write(json.dumps(post, cls=PostEncoder))
 
 class NewPost(BlogHandler):
     def get(self):
@@ -291,10 +323,12 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/unit2/signup', Unit2Signup),
                                ('/unit2/welcome', Welcome),
                                ('/blog/?', BlogFront),
+                               ('/blog/\.json', BlogFrontJson),
                                ('/blog/([0-9]+)', PostPage),
+                               ('/blog/([0-9]+)\.json', PostPageJson),
                                ('/blog/newpost', NewPost),
-                               ('/signup', Register),
-                               ('/login', Login),
+                               ('/blog/signup', Register),
+                               ('/blog/login', Login),
                                ('/logout', Logout),
                                ('/unit3/welcome', Unit3Welcome),
                                ],
