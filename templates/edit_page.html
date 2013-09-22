@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <p class="error">{{ error }}</p>
+  <form method="post">
+    <textarea name="content" id="content" cols="30" rows="10">
+      {% if page %}
+        {{ page.content }}
+      {% endif %}
+    </textarea>
+    <input type="submit">
+  </form>
+{% endblock %}

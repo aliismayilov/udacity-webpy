@@ -3,21 +3,25 @@
 <head>
   <link type="text/css" rel="stylesheet" href="/static/main.css" />
 
-  <title>CS 253 Blog</title>
+  <title>Wiki</title>
 </head>
 
 <body>
-  <a href="/blog" class="main-title">
-    CS 253 Blog
+  <a href="/" class="main-title">
+    Wiki
   </a>
 
   <div class="login-area">
     {% if user %}
-      {{user.name}} (<a class="login-link" href="/logout">logout</a>)
-    {% else %}
-      <a class="login-link" href="/blog/login">login</a>
+      {{ user.name }} (<a class="login-link" href="/logout">logout</a>)
+      {% if page %}
       |
-      <a class="login-link" href="/blog/signup">signup</a>
+      <a href="/_edit{{ page.slug }}" class="login-link">edit page</a>
+      {% endif %}
+    {% else %}
+      <a class="login-link" href="/login">login</a>
+      |
+      <a class="login-link" href="/signup">signup</a>
     {% endif %}
   </div>
 
