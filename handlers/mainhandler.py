@@ -23,6 +23,7 @@ def check_secure_val(secure_val):
 
 class MainHandler(RequestHandler):
     def write(self, *a, **kw):
+        self.response.headers.add_header('Cache-Control', 'max-age=0')
         self.response.out.write(*a, **kw)
 
     def render_str(self, template, **params):

@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <ul>
+    {% for page in pages %}
+      <li>{{ page.created_at.strftime('%c') }} - {{ page.content }} - <a href="{{ page.slug }}?v={{ loop.index }}">view</a></li>
+    {% endfor %}
+  </ul>
+{% endblock %}
