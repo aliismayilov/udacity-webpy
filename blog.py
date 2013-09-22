@@ -5,11 +5,14 @@ import hashlib
 import hmac
 import logging
 import json
+import time
+from datetime import datetime
 from string import letters
 
 import webapp2
 import jinja2
 
+from google.appengine.api import memcache
 from google.appengine.ext import db
 
 template_dir = os.path.join(os.path.dirname(__file__), 'templates')
@@ -72,6 +75,30 @@ class BlogHandler(webapp2.RequestHandler):
             self.format = 'json'
         else:
             self.format = 'html'
+
+    def top(self, update=False):
+        key = 'top'
+        posts = memcache.get(key)
+        if posts is None or update:
+            logging.error('DB query')
+            posts = list(Post.all().order('-created'))
+            memcache.set(key, list(posts))
+            memcache.set('last_top', datetime.now())
+            logging.error(datetime.now())
+        logging.error((posts, len(posts)))
+        return posts
+
+    def get_post(self, post_id):
+        post_key = "Post:%s" % post_id
+        post_last_time = "Post:%s:last_time" % post_id
+        post = memcache.get(post_key)
+        if post is None:
+            key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+            post = db.get(key)
+            memcache.set(post_key, post)
+            memcache.set(post_last_time, datetime.now())
+        return post
+
 
 class MainPage(BlogHandler):
   def get(self):
@@ -151,22 +178,23 @@ class Post(db.Model):
 
 class BlogFront(BlogHandler):
     def get(self):
-        posts = greetings = Post.all().order('-created')
+        posts = self.top()
+        last_top = memcache.get('last_top')
         if self.format == 'html':
-            self.render('front.html', posts = posts)
+            self.render('front.html', posts = posts, last_top_ago = (datetime.now() - last_top).seconds)
         else:
             return self.render_json([p.as_dict() for p in posts])
 
 class PostPage(BlogHandler):
     def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
+        post = self.get_post(post_id)
+        last_time = memcache.get("Post:%s:last_time" % post_id)
 
         if not post:
             self.error(404)
             return
         if self.format == 'html':
-            self.render("permalink.html", post = post)
+            self.render("permalink.html", post = post, last_time_ago = (datetime.now() - last_time).seconds)
         else:
             self.render_json(post.as_dict())
 
@@ -175,7 +203,7 @@ class NewPost(BlogHandler):
         if self.user:
             self.render("newpost.html")
         else:
-            self.redirect("/login")
+            self.redirect("/blog/login")
 
     def post(self):
         if not self.user:
@@ -187,6 +215,9 @@ class NewPost(BlogHandler):
         if subject and content:
             p = Post(parent = blog_key(), subject = subject, content = content)
             p.put()
+            time.sleep(1)
+            self.top(update=True)
+            self.get_post(p.key().id())
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error = "subject and content, please!"
@@ -258,7 +289,7 @@ class Register(Signup):
             u.put()
 
             self.login(u)
-            self.redirect('/unit3/welcome')
+            self.redirect('/blog')
 
 class Login(BlogHandler):
     def get(self):
@@ -271,7 +302,7 @@ class Login(BlogHandler):
         u = User.login(username, password)
         if u:
             self.login(u)
-            self.redirect('/unit3/welcome')
+            self.redirect('/blog')
         else:
             msg = 'Invalid login'
             self.render('login-form.html', error = msg)
@@ -302,9 +333,9 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/?(?:.json)?', BlogFront),
                                ('/blog/([0-9]+)(?:.json)?', PostPage),
                                ('/blog/newpost', NewPost),
-                               ('/signup', Register),
-                               ('/login', Login),
-                               ('/logout', Logout),
+                               ('/blog/signup', Register),
+                               ('/blog/login', Login),
+                               ('/blog/logout', Logout),
                                ('/unit3/welcome', Unit3Welcome),
                                ],
                               debug=True)
