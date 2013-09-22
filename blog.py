@@ -312,6 +312,13 @@ class Logout(BlogHandler):
         self.logout()
         self.redirect('/signup')
 
+
+class FlushHandler(BlogHandler):
+    def get(self):
+        memcache.flush_all()
+        self.redirect('/blog')
+
+
 class Unit3Welcome(BlogHandler):
     def get(self):
         if self.user:
@@ -336,6 +343,7 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/signup', Register),
                                ('/blog/login', Login),
                                ('/blog/logout', Logout),
+                               ('/blog/flush', FlushHandler),
                                ('/unit3/welcome', Unit3Welcome),
                                ],
                               debug=True)
