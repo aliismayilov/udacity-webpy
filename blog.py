@@ -3,6 +3,7 @@ import re
 import random
 import hashlib
 import hmac
+import logging
 import json
 from string import letters
 
@@ -35,10 +36,16 @@ class BlogHandler(webapp2.RequestHandler):
 
     def render_str(self, template, **params):
         params['user'] = self.user
-        return render_str(template, **params)
+        t = jinja_env.get_template(template)
+        return t.render(params)
 
     def render(self, template, **kw):
         self.write(self.render_str(template, **kw))
+
+    def render_json(self, d):
+        json_txt = json.dumps(d)
+        self.response.headers['Content-Type'] = 'application/json; charset=UTF-8'
+        self.write(json_txt)
 
     def set_secure_cookie(self, name, val):
         cookie_val = make_secure_val(val)
@@ -61,9 +68,10 @@ class BlogHandler(webapp2.RequestHandler):
         uid = self.read_secure_cookie('user_id')
         self.user = uid and User.by_id(int(uid))
 
-def render_post(response, post):
-    response.out.write('<b>' + post.subject + '</b><br>')
-    response.out.write(post.content)
+        if self.request.url.endswith('.json'):
+            self.format = 'json'
+        else:
+            self.format = 'html'
 
 class MainPage(BlogHandler):
   def get(self):
@@ -131,29 +139,23 @@ class Post(db.Model):
         self._render_text = self.content.replace('\n', '<br>')
         return render_str("post.html", p = self)
 
-class PostEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Post):
-            return {
-                'content': obj.content,
-                'subject': obj.subject,
-                'created': obj.created.isoformat(),
-                'last_modified': obj.last_modified.isoformat()
-            }
-        # Let the base class default method raise the TypeError
-        return json.JSONEncoder.default(self, obj)
+    def as_dict(self):
+        time_fmt = '%c'
+        d = {'subject': self.subject,
+             'content': self.content,
+             'created': self.created.strftime(time_fmt),
+             'last_modified': self.last_modified.strftime(time_fmt)}
+        return d
+
+
 
 class BlogFront(BlogHandler):
     def get(self):
         posts = greetings = Post.all().order('-created')
-        self.render('front.html', posts = posts)
-
-class BlogFrontJson(BlogHandler):
-    def get(self):
-        posts = greetings = Post.all().order('-created')
-        posts = list(posts)
-        self.response.headers['Content-Type'] = "application/json'; charset=utf-8"
-        self.write(json.dumps(posts, cls=PostEncoder))
+        if self.format == 'html':
+            self.render('front.html', posts = posts)
+        else:
+            return self.render_json([p.as_dict() for p in posts])
 
 class PostPage(BlogHandler):
     def get(self, post_id):
@@ -163,20 +165,10 @@ class PostPage(BlogHandler):
         if not post:
             self.error(404)
             return
-
-        self.render("permalink.html", post = post)
-
-class PostPageJson(BlogHandler):
-    def get(self, post_id):
-        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
-        post = db.get(key)
-
-        if not post:
-            self.error(404)
-            return
-
-        self.response.headers['Content-Type'] = "application/json'; charset=utf-8"
-        self.write(json.dumps(post, cls=PostEncoder))
+        if self.format == 'html':
+            self.render("permalink.html", post = post)
+        else:
+            self.render_json(post.as_dict())
 
 class NewPost(BlogHandler):
     def get(self):
@@ -199,20 +191,6 @@ class NewPost(BlogHandler):
         else:
             error = "subject and content, please!"
             self.render("newpost.html", subject=subject, content=content, error=error)
-
-
-###### Unit 2 HW's
-class Rot13(BlogHandler):
-    def get(self):
-        self.render('rot13-form.html')
-
-    def post(self):
-        rot13 = ''
-        text = self.request.get('text')
-        if text:
-            rot13 = text.encode('rot13')
-
-        self.render('rot13-form.html', text = rot13)
 
 
 USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
@@ -280,7 +258,7 @@ class Register(Signup):
             u.put()
 
             self.login(u)
-            self.redirect('/blog')
+            self.redirect('/unit3/welcome')
 
 class Login(BlogHandler):
     def get(self):
@@ -293,7 +271,7 @@ class Login(BlogHandler):
         u = User.login(username, password)
         if u:
             self.login(u)
-            self.redirect('/blog')
+            self.redirect('/unit3/welcome')
         else:
             msg = 'Invalid login'
             self.render('login-form.html', error = msg)
@@ -319,16 +297,13 @@ class Welcome(BlogHandler):
             self.redirect('/unit2/signup')
 
 app = webapp2.WSGIApplication([('/', MainPage),
-                               ('/unit2/rot13', Rot13),
                                ('/unit2/signup', Unit2Signup),
                                ('/unit2/welcome', Welcome),
-                               ('/blog/?', BlogFront),
-                               ('/blog/\.json', BlogFrontJson),
-                               ('/blog/([0-9]+)', PostPage),
-                               ('/blog/([0-9]+)\.json', PostPageJson),
+                               ('/blog/?(?:.json)?', BlogFront),
+                               ('/blog/([0-9]+)(?:.json)?', PostPage),
                                ('/blog/newpost', NewPost),
-                               ('/blog/signup', Register),
-                               ('/blog/login', Login),
+                               ('/signup', Register),
+                               ('/login', Login),
                                ('/logout', Logout),
                                ('/unit3/welcome', Unit3Welcome),
                                ],
